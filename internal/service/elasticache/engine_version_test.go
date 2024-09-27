@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/YakDriver/regexache"
+	"github.com/hashicorp/go-cty/cty"
 	"github.com/hashicorp/go-version"
 	"github.com/hashicorp/terraform-provider-aws/internal/acctest"
 	tfelasticache "github.com/hashicorp/terraform-provider-aws/internal/service/elasticache"
@@ -511,6 +512,18 @@ func (d *mockForceNewDiffer) ForceNew(key string) error {
 	return nil
 }
 
+func (d *mockForceNewDiffer) GetRawConfig() cty.Value {
+	return cty.Value{}
+}
+
+func (d *mockForceNewDiffer) GetRawPlan() cty.Value {
+	return cty.Value{}
+}
+
+func (d *mockForceNewDiffer) GetRawState() cty.Value {
+	return cty.Value{}
+}
+
 func TestCustomizeDiffEngineVersionForceNewOnDowngrade(t *testing.T) {
 	t.Parallel()
 
@@ -785,6 +798,18 @@ func (d *mockChangesDiffer) HasChanges(...string) bool {
 
 func (d *mockChangesDiffer) GetChange(key string) (any, any) {
 	return d.values[key].GetChange()
+}
+
+func (d *mockChangesDiffer) GetRawConfig() cty.Value {
+	return cty.Value{}
+}
+
+func (d *mockChangesDiffer) GetRawPlan() cty.Value {
+	return cty.Value{}
+}
+
+func (d *mockChangesDiffer) GetRawState() cty.Value {
+	return cty.Value{}
 }
 
 func TestParamGroupNameRequiresMajorVersionUpgrade(t *testing.T) {

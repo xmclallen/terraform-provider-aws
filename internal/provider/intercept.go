@@ -7,7 +7,6 @@ import (
 	"context"
 
 	"github.com/hashicorp/aws-sdk-go-base/v2/tfawserr"
-	"github.com/hashicorp/go-cty/cty"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -23,15 +22,9 @@ import (
 	"github.com/hashicorp/terraform-provider-aws/names"
 )
 
-// schemaResourceData is an interface that implements functions from schema.ResourceData
+// schemaResourceData is an interface that implements functions from schema.ResourceData.
 type schemaResourceData interface {
-	Get(key string) any
-	GetChange(key string) (any, any)
-	GetRawConfig() cty.Value
-	GetRawPlan() cty.Value
-	GetRawState() cty.Value
-	HasChange(key string) bool
-	Id() string
+	sdkv2.ResourceDiffer
 	Set(string, any) error
 }
 
