@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-provider-aws/internal/conns"
 	"github.com/hashicorp/terraform-provider-aws/internal/errs"
 	"github.com/hashicorp/terraform-provider-aws/internal/errs/sdkdiag"
+	"github.com/hashicorp/terraform-provider-aws/internal/sdkv2"
 	"github.com/hashicorp/terraform-provider-aws/internal/slices"
 	tftags "github.com/hashicorp/terraform-provider-aws/internal/tags"
 	"github.com/hashicorp/terraform-provider-aws/internal/tfresource"
@@ -92,7 +93,7 @@ func (s interceptorItems) why(why why) interceptorItems {
 func interceptedHandler[F ~func(context.Context, *schema.ResourceData, any) diag.Diagnostics](bootstrapContext contextFunc, interceptors interceptorItems, f F, why why) F {
 	return func(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
 		var diags diag.Diagnostics
-		ctx = bootstrapContext(ctx, meta)
+		ctx = bootstrapContext(ctx, d, meta)
 		// Before interceptors are run first to last.
 		forward := interceptors.why(why)
 
@@ -135,7 +136,7 @@ func interceptedHandler[F ~func(context.Context, *schema.ResourceData, any) diag
 }
 
 // contextFunc augments Context.
-type contextFunc func(context.Context, any) context.Context
+type contextFunc func(context.Context, sdkv2.ResourceDiffer, any) context.Context
 
 // wrappedDataSource represents an interceptor dispatcher for a Plugin SDK v2 data source.
 type wrappedDataSource struct {
@@ -173,7 +174,7 @@ func (r *wrappedResource) Delete(f schema.DeleteContextFunc) schema.DeleteContex
 
 func (r *wrappedResource) State(f schema.StateContextFunc) schema.StateContextFunc {
 	return func(ctx context.Context, d *schema.ResourceData, meta any) ([]*schema.ResourceData, error) {
-		ctx = r.bootstrapContext(ctx, meta)
+		ctx = r.bootstrapContext(ctx, d, meta)
 
 		return f(ctx, d, meta)
 	}
@@ -181,7 +182,7 @@ func (r *wrappedResource) State(f schema.StateContextFunc) schema.StateContextFu
 
 func (r *wrappedResource) CustomizeDiff(f schema.CustomizeDiffFunc) schema.CustomizeDiffFunc {
 	return func(ctx context.Context, d *schema.ResourceDiff, meta any) error {
-		ctx = r.bootstrapContext(ctx, meta)
+		ctx = r.bootstrapContext(ctx, d, meta)
 
 		return f(ctx, d, meta)
 	}
@@ -189,7 +190,7 @@ func (r *wrappedResource) CustomizeDiff(f schema.CustomizeDiffFunc) schema.Custo
 
 func (r *wrappedResource) StateUpgrade(f schema.StateUpgradeFunc) schema.StateUpgradeFunc {
 	return func(ctx context.Context, rawState map[string]interface{}, meta any) (map[string]interface{}, error) {
-		ctx = r.bootstrapContext(ctx, meta)
+		ctx = r.bootstrapContext(ctx, nil, meta) // TODO: Handle rawState
 
 		return f(ctx, rawState, meta)
 	}

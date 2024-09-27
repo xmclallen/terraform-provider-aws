@@ -19,7 +19,7 @@ var (
 		MaxItems: 1,
 		Elem: &schema.Resource{
 			Schema: map[string]*schema.Schema{
-				"default_tags": {
+				"default_tags": { // TODO: Only for aws_s3_object?
 					Type:     schema.TypeList,
 					Optional: true,
 					MaxItems: 1,
@@ -36,7 +36,8 @@ var (
 				names.AttrRegion: {
 					Type:         schema.TypeString,
 					Optional:     true,
-					ValidateFunc: verify.ValidRegionName,
+					ForceNew:     true,
+					ValidateFunc: verify.ValidRegionName, // TODO: Valid for partition
 				},
 			},
 		},

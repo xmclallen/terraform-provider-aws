@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-provider-aws/internal/errs/sdkdiag"
+	"github.com/hashicorp/terraform-provider-aws/internal/sdkv2"
 )
 
 func TestInterceptorsWhy(t *testing.T) {
@@ -84,7 +85,7 @@ func TestInterceptedHandler(t *testing.T) {
 		var diags diag.Diagnostics
 		return sdkdiag.AppendErrorf(diags, "read error")
 	}
-	bootstrapContext := func(ctx context.Context, meta any) context.Context {
+	bootstrapContext := func(ctx context.Context, d sdkv2.ResourceDiffer, meta any) context.Context {
 		return ctx
 	}
 
