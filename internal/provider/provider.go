@@ -411,6 +411,28 @@ func New(ctx context.Context) (*schema.Provider, error) {
 				})
 			}
 
+			// HACK
+			// HACK Inject an override_provider top-level configuration block for every resource.
+			// HACK
+			if typeName == "aws_accessanalyzer_analyzer" {
+				s := r.SchemaMap()
+
+				if _, ok := s[names.AttrOverrideProvider]; ok {
+					errs = append(errs, fmt.Errorf("`%s` attribute defined: %s", names.AttrOverrideProvider, typeName))
+					continue
+				}
+
+				if f := r.SchemaFunc; f != nil {
+					r.SchemaFunc = func() map[string]*schema.Schema {
+						s := f()
+						s[names.AttrOverrideProvider] = overrideProviderSchema
+						return s
+					}
+				} else {
+					r.Schema[names.AttrOverrideProvider] = overrideProviderSchema
+				}
+			}
+
 			rs := &wrappedResource{
 				bootstrapContext: bootstrapContext,
 				interceptors:     interceptors,
