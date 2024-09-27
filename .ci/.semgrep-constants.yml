@@ -2269,6 +2269,24 @@ rules:
     options:
       constant_propagation: false
 
+  - id: literal-override_provider-string-constant
+    languages: [go]
+    message: Use the constant `names.AttrOverrideProvider` for the string literal "override_provider"
+    paths:
+      include:
+        - "internal/service/**/*.go"
+    patterns:
+      - pattern: '"override_provider"'
+      - pattern-not-regex: '"override_provider":\s+test\w+,'
+      - pattern-not-inside: 'config.Variables{ ... }'
+      - pattern-not-inside: 'packageName = ...'
+      - pattern-not-inside: 'provider.ConflictingEndpointsWarningDiag(...)'
+      - pattern-not-inside: 'const $X = ...'
+    severity: ERROR
+    fix: "names.AttrOverrideProvider"
+    options:
+      constant_propagation: false
+
   - id: literal-owner-string-constant
     languages: [go]
     message: Use the constant `names.AttrOwner` for the string literal "owner"

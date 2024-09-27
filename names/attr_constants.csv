@@ -124,6 +124,7 @@ names,Names
 namespace,Namespace
 network_configuration,NetworkConfiguration
 network_interface_id,NetworkInterfaceID
+override_provider,OverrideProvider
 owner,Owner
 owner_account_id,OwnerAccountID
 owner_id,OwnerID
