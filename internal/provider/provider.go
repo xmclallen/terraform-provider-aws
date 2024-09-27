@@ -372,6 +372,16 @@ func New(ctx context.Context) (*schema.Provider, error) {
 					ctx = tftags.NewContext(ctx, v.DefaultTagsConfig, v.IgnoreTagsConfig)
 					ctx = v.RegisterLogger(ctx)
 				}
+				// HACK
+				// HACK Expand any override_provider top-level configuration block.
+				// HACK
+				if d != nil {
+					if v, ok := d.GetOk("override_provider"); ok && len(v.([]interface{})) > 0 && v.([]interface{})[0] != nil {
+						if v := expandOverrideProviderModel(ctx, v.([]interface{})[0].(map[string]interface{})); v != nil {
+
+						}
+					}
+				}
 
 				return ctx
 			}

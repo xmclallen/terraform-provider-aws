@@ -29,16 +29,31 @@ var (
 
 // InContext represents the resource information kept in Context.
 type InContext struct {
-	IsDataSource       bool   // Data source?
-	ResourceName       string // Friendly resource name, e.g. "Subnet"
-	ServicePackageName string // Canonical name defined as a constant in names package
+	isDataSource       bool   // Data source?
+	resourceName       string // Friendly resource name, e.g. "Subnet"
+	servicePackageName string // Canonical name defined as a constant in names package
+}
+
+// IsDataSource returns true if the resource is a data source.
+func (c *InContext) IsDataSource() bool {
+	return c.isDataSource
+}
+
+// ResourceName returns the friendly resource name, e.g. "Subnet".
+func (c *InContext) ResourceName() string {
+	return c.resourceName
+}
+
+// ServicePackageName returns the canonical service name defined as a constant in the `names` package.
+func (c *InContext) ServicePackageName() string {
+	return c.servicePackageName
 }
 
 func NewDataSourceContext(ctx context.Context, servicePackageName, resourceName string) context.Context {
 	v := InContext{
-		IsDataSource:       true,
-		ResourceName:       resourceName,
-		ServicePackageName: servicePackageName,
+		isDataSource:       true,
+		resourceName:       resourceName,
+		servicePackageName: servicePackageName,
 	}
 
 	return context.WithValue(ctx, contextKey, &v)
@@ -46,8 +61,8 @@ func NewDataSourceContext(ctx context.Context, servicePackageName, resourceName 
 
 func NewResourceContext(ctx context.Context, servicePackageName, resourceName string) context.Context {
 	v := InContext{
-		ResourceName:       resourceName,
-		ServicePackageName: servicePackageName,
+		resourceName:       resourceName,
+		servicePackageName: servicePackageName,
 	}
 
 	return context.WithValue(ctx, contextKey, &v)
