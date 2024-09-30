@@ -26,21 +26,25 @@ var (
 					Elem: &schema.Resource{
 						Schema: map[string]*schema.Schema{
 							names.AttrTags: {
-								Type:     schema.TypeMap,
-								Optional: true,
-								Elem:     &schema.Schema{Type: schema.TypeString},
+								Type:        schema.TypeMap,
+								Optional:    true,
+								Elem:        &schema.Schema{Type: schema.TypeString},
+								Description: `Resource tags.`,
 							},
 						},
 					},
+					Description: `Per-resource default tags override.`,
 				},
 				names.AttrRegion: {
 					Type:         schema.TypeString,
 					Optional:     true,
 					ForceNew:     true,
 					ValidateFunc: verify.ValidRegionName, // TODO: Valid for partition
+					Description:  `Per-resource Region override.`,
 				},
 			},
 		},
+		Description: `Configuration block to override the provider configuration.`,
 	}
 )
 
