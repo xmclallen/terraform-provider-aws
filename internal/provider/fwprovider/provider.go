@@ -25,7 +25,6 @@ import (
 	"github.com/hashicorp/terraform-provider-aws/names"
 )
 
-var _ provider.Provider = &fwprovider{}
 var _ provider.ProviderWithFunctions = &fwprovider{}
 
 // New returns a new, initialized Terraform Plugin Framework-style provider instance.
@@ -40,14 +39,13 @@ type fwprovider struct {
 	Primary interface{ Meta() interface{} }
 }
 
-func (p *fwprovider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
-	resp.TypeName = "aws"
+func (*fwprovider) Metadata(ctx context.Context, request provider.MetadataRequest, response *provider.MetadataResponse) {
+	response.TypeName = "aws"
 }
 
-// Schema returns the schema for this provider's configuration.
-func (p *fwprovider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
+func (p *fwprovider) Schema(ctx context.Context, request provider.SchemaRequest, response *provider.SchemaResponse) {
 	// This schema must match exactly the Terraform Protocol v5 (Terraform Plugin SDK v2) provider's schema.
-	resp.Schema = schema.Schema{
+	response.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"access_key": schema.StringAttribute{
 				Optional:    true,
@@ -293,9 +291,6 @@ func (p *fwprovider) Schema(ctx context.Context, req provider.SchemaRequest, res
 	}
 }
 
-// Configure is called at the beginning of the provider lifecycle, when
-// Terraform sends to the provider the values the user specified in the
-// provider configuration block.
 func (p *fwprovider) Configure(ctx context.Context, request provider.ConfigureRequest, response *provider.ConfigureResponse) {
 	// Provider's parsed configuration (its instance state) is available through the primary provider's Meta() method.
 	v := p.Primary.Meta()
@@ -303,11 +298,6 @@ func (p *fwprovider) Configure(ctx context.Context, request provider.ConfigureRe
 	response.ResourceData = v
 }
 
-// DataSources returns a slice of functions to instantiate each DataSource
-// implementation.
-//
-// The data source type name is determined by the DataSource implementing
-// the Metadata method. All data sources must have unique names.
 func (p *fwprovider) DataSources(ctx context.Context) []func() datasource.DataSource {
 	var errs []error
 	var dataSources []func() datasource.DataSource
@@ -377,11 +367,6 @@ func (p *fwprovider) DataSources(ctx context.Context) []func() datasource.DataSo
 	return dataSources
 }
 
-// Resources returns a slice of functions to instantiate each Resource
-// implementation.
-//
-// The resource type name is determined by the Resource implementing
-// the Metadata method. All resources must have unique names.
 func (p *fwprovider) Resources(ctx context.Context) []func() resource.Resource {
 	var errs []error
 	var resources []func() resource.Resource
@@ -414,12 +399,12 @@ func (p *fwprovider) Resources(ctx context.Context) []func() resource.Resource {
 			}
 			interceptors := resourceInterceptors{}
 
+			schemaResponse := resource.SchemaResponse{}
+			inner.Schema(ctx, resource.SchemaRequest{}, &schemaResponse)
+
 			if v.Tags != nil {
 				// The resource has opted in to transparent tagging.
 				// Ensure that the schema look OK.
-				schemaResponse := resource.SchemaResponse{}
-				inner.Schema(ctx, resource.SchemaRequest{}, &schemaResponse)
-
 				if v, ok := schemaResponse.Schema.Attributes[names.AttrTags]; ok {
 					if v.IsComputed() {
 						errs = append(errs, fmt.Errorf("`%s` attribute cannot be Computed: %s", names.AttrTags, typeName))
@@ -441,6 +426,15 @@ func (p *fwprovider) Resources(ctx context.Context) []func() resource.Resource {
 
 				interceptors = append(interceptors, tagsResourceInterceptor{tags: v.Tags})
 			}
+
+			// HACK
+			// HACK Inject an override_provider top-level configuration block for every resource.
+			// HACK
+			if _, ok := schemaResponse.Schema.Blocks[names.AttrOverrideProvider]; ok {
+				errs = append(errs, fmt.Errorf("`%s` block defined: %s", names.AttrOverrideProvider, typeName))
+				continue
+			}
+			// HACK Injection done in wrapperResource.
 
 			resources = append(resources, func() resource.Resource {
 				return newWrappedResource(bootstrapContext, inner, interceptors)

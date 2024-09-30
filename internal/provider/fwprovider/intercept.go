@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/hashicorp/terraform-provider-aws/internal/conns"
 	"github.com/hashicorp/terraform-provider-aws/internal/errs"
@@ -272,6 +273,14 @@ func (w *wrappedResource) Metadata(ctx context.Context, request resource.Metadat
 func (w *wrappedResource) Schema(ctx context.Context, request resource.SchemaRequest, response *resource.SchemaResponse) {
 	ctx = w.bootstrapContext(ctx, w.meta)
 	w.inner.Schema(ctx, request, response)
+
+	// HACK
+	// HACK Inject an override_provider top-level configuration block for every resource.
+	// HACK
+	if response.Schema.Blocks == nil {
+		response.Schema.Blocks = map[string]schema.Block{}
+	}
+	response.Schema.Blocks[names.AttrOverrideProvider] = overrideProviderBlock(ctx)
 }
 
 func (w *wrappedResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
