@@ -192,6 +192,7 @@ func findAppBundleByID(ctx context.Context, conn *appfabric.Client, arn string) 
 }
 
 type appBundleResourceModel struct {
+	framework.WithOverrideProviderModel
 	ARN                   types.String `tfsdk:"arn"`
 	CustomerManagedKeyARN fwtypes.ARN  `tfsdk:"customer_managed_key_arn"`
 	ID                    types.String `tfsdk:"id"`
