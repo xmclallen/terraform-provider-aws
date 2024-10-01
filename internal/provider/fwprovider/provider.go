@@ -322,7 +322,7 @@ func (p *fwprovider) DataSources(ctx context.Context) []func() datasource.DataSo
 			typeName := metadataResponse.TypeName
 
 			// bootstrapContext is run on all wrapped methods before any interceptors.
-			bootstrapContext := func(ctx context.Context, meta *conns.AWSClient) context.Context {
+			bootstrapContext := func(ctx context.Context, getter dataGetter, meta *conns.AWSClient) context.Context {
 				ctx = conns.NewDataSourceContext(ctx, servicePackageName, v.Name)
 				if meta != nil {
 					ctx = tftags.NewContext(ctx, meta.DefaultTagsConfig, meta.IgnoreTagsConfig)
@@ -387,7 +387,7 @@ func (p *fwprovider) Resources(ctx context.Context) []func() resource.Resource {
 			typeName := metadataResponse.TypeName
 
 			// bootstrapContext is run on all wrapped methods before any interceptors.
-			bootstrapContext := func(ctx context.Context, meta *conns.AWSClient) context.Context {
+			bootstrapContext := func(ctx context.Context, getter dataGetter, meta *conns.AWSClient) context.Context {
 				ctx = conns.NewResourceContext(ctx, servicePackageName, v.Name)
 				if meta != nil {
 					ctx = tftags.NewContext(ctx, meta.DefaultTagsConfig, meta.IgnoreTagsConfig)

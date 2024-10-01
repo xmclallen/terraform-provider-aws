@@ -190,8 +190,11 @@ func interceptedResourceHandler[Request resourceCRUDRequest, Response resourceCR
 	}
 }
 
+// Implemented by (Config|Plan|State).Get().
+type dataGetter func(context.Context, any) diag.Diagnostics
+
 // contextFunc augments Context.
-type contextFunc func(context.Context, *conns.AWSClient) context.Context
+type contextFunc func(context.Context, dataGetter, *conns.AWSClient) context.Context
 
 // wrappedDataSource represents an interceptor dispatcher for a Plugin Framework data source.
 type wrappedDataSource struct {
@@ -211,12 +214,12 @@ func newWrappedDataSource(bootstrapContext contextFunc, inner datasource.DataSou
 }
 
 func (w *wrappedDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
-	ctx = w.bootstrapContext(ctx, w.meta)
+	ctx = w.bootstrapContext(ctx, nil, w.meta)
 	w.inner.Metadata(ctx, request, response)
 }
 
 func (w *wrappedDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
-	ctx = w.bootstrapContext(ctx, w.meta)
+	ctx = w.bootstrapContext(ctx, nil, w.meta)
 	w.inner.Schema(ctx, request, response)
 }
 
@@ -225,7 +228,7 @@ func (w *wrappedDataSource) Read(ctx context.Context, request datasource.ReadReq
 		w.inner.Read(ctx, request, response)
 		return response.Diagnostics
 	}
-	ctx = w.bootstrapContext(ctx, w.meta)
+	ctx = w.bootstrapContext(ctx, request.Config.Get, w.meta)
 	diags := interceptedDataSourceReadHandler(w.interceptors.read(), f, w.meta)(ctx, request, response)
 	response.Diagnostics = diags
 }
@@ -234,7 +237,7 @@ func (w *wrappedDataSource) Configure(ctx context.Context, request datasource.Co
 	if v, ok := request.ProviderData.(*conns.AWSClient); ok {
 		w.meta = v
 	}
-	ctx = w.bootstrapContext(ctx, w.meta)
+	ctx = w.bootstrapContext(ctx, nil, w.meta)
 	w.inner.Configure(ctx, request, response)
 }
 
@@ -266,12 +269,12 @@ func newWrappedResource(bootstrapContext contextFunc, inner resource.ResourceWit
 }
 
 func (w *wrappedResource) Metadata(ctx context.Context, request resource.MetadataRequest, response *resource.MetadataResponse) {
-	ctx = w.bootstrapContext(ctx, w.meta)
+	ctx = w.bootstrapContext(ctx, nil, w.meta)
 	w.inner.Metadata(ctx, request, response)
 }
 
 func (w *wrappedResource) Schema(ctx context.Context, request resource.SchemaRequest, response *resource.SchemaResponse) {
-	ctx = w.bootstrapContext(ctx, w.meta)
+	ctx = w.bootstrapContext(ctx, nil, w.meta)
 	w.inner.Schema(ctx, request, response)
 
 	// HACK
@@ -288,7 +291,7 @@ func (w *wrappedResource) Create(ctx context.Context, request resource.CreateReq
 		w.inner.Create(ctx, request, response)
 		return response.Diagnostics
 	}
-	ctx = w.bootstrapContext(ctx, w.meta)
+	ctx = w.bootstrapContext(ctx, request.Plan.Get, w.meta)
 	diags := interceptedResourceHandler(w.interceptors.create(), f, w.meta)(ctx, request, response)
 	response.Diagnostics = diags
 }
@@ -298,7 +301,7 @@ func (w *wrappedResource) Read(ctx context.Context, request resource.ReadRequest
 		w.inner.Read(ctx, request, response)
 		return response.Diagnostics
 	}
-	ctx = w.bootstrapContext(ctx, w.meta)
+	ctx = w.bootstrapContext(ctx, request.State.Get, w.meta)
 	diags := interceptedResourceHandler(w.interceptors.read(), f, w.meta)(ctx, request, response)
 	response.Diagnostics = diags
 }
@@ -308,7 +311,7 @@ func (w *wrappedResource) Update(ctx context.Context, request resource.UpdateReq
 		w.inner.Update(ctx, request, response)
 		return response.Diagnostics
 	}
-	ctx = w.bootstrapContext(ctx, w.meta)
+	ctx = w.bootstrapContext(ctx, request.Plan.Get, w.meta)
 	diags := interceptedResourceHandler(w.interceptors.update(), f, w.meta)(ctx, request, response)
 	response.Diagnostics = diags
 }
@@ -318,7 +321,7 @@ func (w *wrappedResource) Delete(ctx context.Context, request resource.DeleteReq
 		w.inner.Delete(ctx, request, response)
 		return response.Diagnostics
 	}
-	ctx = w.bootstrapContext(ctx, w.meta)
+	ctx = w.bootstrapContext(ctx, request.State.Get, w.meta)
 	diags := interceptedResourceHandler(w.interceptors.delete(), f, w.meta)(ctx, request, response)
 	response.Diagnostics = diags
 }
@@ -327,13 +330,13 @@ func (w *wrappedResource) Configure(ctx context.Context, request resource.Config
 	if v, ok := request.ProviderData.(*conns.AWSClient); ok {
 		w.meta = v
 	}
-	ctx = w.bootstrapContext(ctx, w.meta)
+	ctx = w.bootstrapContext(ctx, nil, w.meta)
 	w.inner.Configure(ctx, request, response)
 }
 
 func (w *wrappedResource) ImportState(ctx context.Context, request resource.ImportStateRequest, response *resource.ImportStateResponse) {
 	if v, ok := w.inner.(resource.ResourceWithImportState); ok {
-		ctx = w.bootstrapContext(ctx, w.meta)
+		ctx = w.bootstrapContext(ctx, nil, w.meta)
 		v.ImportState(ctx, request, response)
 
 		return
@@ -347,14 +350,14 @@ func (w *wrappedResource) ImportState(ctx context.Context, request resource.Impo
 
 func (w *wrappedResource) ModifyPlan(ctx context.Context, request resource.ModifyPlanRequest, response *resource.ModifyPlanResponse) {
 	if v, ok := w.inner.(resource.ResourceWithModifyPlan); ok {
-		ctx = w.bootstrapContext(ctx, w.meta)
+		ctx = w.bootstrapContext(ctx, request.Config.Get, w.meta)
 		v.ModifyPlan(ctx, request, response)
 	}
 }
 
 func (w *wrappedResource) ConfigValidators(ctx context.Context) []resource.ConfigValidator {
 	if v, ok := w.inner.(resource.ResourceWithConfigValidators); ok {
-		ctx = w.bootstrapContext(ctx, w.meta)
+		ctx = w.bootstrapContext(ctx, nil, w.meta)
 		return v.ConfigValidators(ctx)
 	}
 
@@ -363,14 +366,14 @@ func (w *wrappedResource) ConfigValidators(ctx context.Context) []resource.Confi
 
 func (w *wrappedResource) ValidateConfig(ctx context.Context, request resource.ValidateConfigRequest, response *resource.ValidateConfigResponse) {
 	if v, ok := w.inner.(resource.ResourceWithValidateConfig); ok {
-		ctx = w.bootstrapContext(ctx, w.meta)
+		ctx = w.bootstrapContext(ctx, nil, w.meta)
 		v.ValidateConfig(ctx, request, response)
 	}
 }
 
 func (w *wrappedResource) UpgradeState(ctx context.Context) map[int64]resource.StateUpgrader {
 	if v, ok := w.inner.(resource.ResourceWithUpgradeState); ok {
-		ctx = w.bootstrapContext(ctx, w.meta)
+		ctx = w.bootstrapContext(ctx, nil, w.meta)
 
 		return v.UpgradeState(ctx)
 	}
@@ -380,7 +383,7 @@ func (w *wrappedResource) UpgradeState(ctx context.Context) map[int64]resource.S
 
 func (w *wrappedResource) MoveState(ctx context.Context) []resource.StateMover {
 	if v, ok := w.inner.(resource.ResourceWithMoveState); ok {
-		ctx = w.bootstrapContext(ctx, w.meta)
+		ctx = w.bootstrapContext(ctx, nil, w.meta)
 
 		return v.MoveState(ctx)
 	}
