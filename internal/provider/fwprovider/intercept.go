@@ -190,11 +190,11 @@ func interceptedResourceHandler[Request resourceCRUDRequest, Response resourceCR
 	}
 }
 
-// Implemented by (Config|Plan|State).Get().
-type dataGetter func(context.Context, any) diag.Diagnostics
+// Implemented by (Config|Plan|State).GetAttribute().
+type getAttributeFunc func(context.Context, path.Path, any) diag.Diagnostics
 
 // contextFunc augments Context.
-type contextFunc func(context.Context, dataGetter, *conns.AWSClient) context.Context
+type contextFunc func(context.Context, getAttributeFunc, *conns.AWSClient) context.Context
 
 // wrappedDataSource represents an interceptor dispatcher for a Plugin Framework data source.
 type wrappedDataSource struct {
@@ -228,7 +228,7 @@ func (w *wrappedDataSource) Read(ctx context.Context, request datasource.ReadReq
 		w.inner.Read(ctx, request, response)
 		return response.Diagnostics
 	}
-	ctx = w.bootstrapContext(ctx, request.Config.Get, w.meta)
+	ctx = w.bootstrapContext(ctx, request.Config.GetAttribute, w.meta)
 	diags := interceptedDataSourceReadHandler(w.interceptors.read(), f, w.meta)(ctx, request, response)
 	response.Diagnostics = diags
 }
@@ -291,7 +291,7 @@ func (w *wrappedResource) Create(ctx context.Context, request resource.CreateReq
 		w.inner.Create(ctx, request, response)
 		return response.Diagnostics
 	}
-	ctx = w.bootstrapContext(ctx, request.Plan.Get, w.meta)
+	ctx = w.bootstrapContext(ctx, request.Plan.GetAttribute, w.meta)
 	diags := interceptedResourceHandler(w.interceptors.create(), f, w.meta)(ctx, request, response)
 	response.Diagnostics = diags
 }
@@ -301,7 +301,7 @@ func (w *wrappedResource) Read(ctx context.Context, request resource.ReadRequest
 		w.inner.Read(ctx, request, response)
 		return response.Diagnostics
 	}
-	ctx = w.bootstrapContext(ctx, request.State.Get, w.meta)
+	ctx = w.bootstrapContext(ctx, request.State.GetAttribute, w.meta)
 	diags := interceptedResourceHandler(w.interceptors.read(), f, w.meta)(ctx, request, response)
 	response.Diagnostics = diags
 }
@@ -311,7 +311,7 @@ func (w *wrappedResource) Update(ctx context.Context, request resource.UpdateReq
 		w.inner.Update(ctx, request, response)
 		return response.Diagnostics
 	}
-	ctx = w.bootstrapContext(ctx, request.Plan.Get, w.meta)
+	ctx = w.bootstrapContext(ctx, request.Plan.GetAttribute, w.meta)
 	diags := interceptedResourceHandler(w.interceptors.update(), f, w.meta)(ctx, request, response)
 	response.Diagnostics = diags
 }
@@ -321,7 +321,7 @@ func (w *wrappedResource) Delete(ctx context.Context, request resource.DeleteReq
 		w.inner.Delete(ctx, request, response)
 		return response.Diagnostics
 	}
-	ctx = w.bootstrapContext(ctx, request.State.Get, w.meta)
+	ctx = w.bootstrapContext(ctx, request.State.GetAttribute, w.meta)
 	diags := interceptedResourceHandler(w.interceptors.delete(), f, w.meta)(ctx, request, response)
 	response.Diagnostics = diags
 }
@@ -350,7 +350,7 @@ func (w *wrappedResource) ImportState(ctx context.Context, request resource.Impo
 
 func (w *wrappedResource) ModifyPlan(ctx context.Context, request resource.ModifyPlanRequest, response *resource.ModifyPlanResponse) {
 	if v, ok := w.inner.(resource.ResourceWithModifyPlan); ok {
-		ctx = w.bootstrapContext(ctx, request.Config.Get, w.meta)
+		ctx = w.bootstrapContext(ctx, request.Config.GetAttribute, w.meta)
 		v.ModifyPlan(ctx, request, response)
 	}
 }
