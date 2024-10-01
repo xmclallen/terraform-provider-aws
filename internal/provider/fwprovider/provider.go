@@ -10,7 +10,9 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/function"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -18,6 +20,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/hashicorp/terraform-provider-aws/internal/conns"
+	"github.com/hashicorp/terraform-provider-aws/internal/framework"
 	"github.com/hashicorp/terraform-provider-aws/internal/framework/flex"
 	fwtypes "github.com/hashicorp/terraform-provider-aws/internal/framework/types"
 	tffunction "github.com/hashicorp/terraform-provider-aws/internal/function"
@@ -322,14 +325,16 @@ func (p *fwprovider) DataSources(ctx context.Context) []func() datasource.DataSo
 			typeName := metadataResponse.TypeName
 
 			// bootstrapContext is run on all wrapped methods before any interceptors.
-			bootstrapContext := func(ctx context.Context, getter getAttributeFunc, meta *conns.AWSClient) context.Context {
+			bootstrapContext := func(ctx context.Context, getter getAttributeFunc, meta *conns.AWSClient) (context.Context, diag.Diagnostics) {
+				var diags diag.Diagnostics
+
 				ctx = conns.NewDataSourceContext(ctx, servicePackageName, v.Name)
 				if meta != nil {
 					ctx = tftags.NewContext(ctx, meta.DefaultTagsConfig, meta.IgnoreTagsConfig)
 					ctx = meta.RegisterLogger(ctx)
 				}
 
-				return ctx
+				return ctx, diags
 			}
 			interceptors := dataSourceInterceptors{}
 
@@ -387,7 +392,9 @@ func (p *fwprovider) Resources(ctx context.Context) []func() resource.Resource {
 			typeName := metadataResponse.TypeName
 
 			// bootstrapContext is run on all wrapped methods before any interceptors.
-			bootstrapContext := func(ctx context.Context, getter getAttributeFunc, meta *conns.AWSClient) context.Context {
+			bootstrapContext := func(ctx context.Context, getter getAttributeFunc, meta *conns.AWSClient) (context.Context, diag.Diagnostics) {
+				var diags diag.Diagnostics
+
 				ctx = conns.NewResourceContext(ctx, servicePackageName, v.Name)
 				if meta != nil {
 					ctx = tftags.NewContext(ctx, meta.DefaultTagsConfig, meta.IgnoreTagsConfig)
@@ -395,7 +402,23 @@ func (p *fwprovider) Resources(ctx context.Context) []func() resource.Resource {
 					ctx = flex.RegisterLogger(ctx)
 				}
 
-				return ctx
+				// HACK
+				// HACK Expand any override_provider top-level configuration block.
+				// HACK
+				if getter != nil {
+					var data fwtypes.ListNestedObjectValueOf[framework.OverrideProviderModel]
+
+					diags.Append(getter(ctx, path.Root(names.AttrOverrideProvider), &data)...)
+					if !diags.HasError() {
+						model, d := data.ToPtr(ctx)
+						diags.Append(d...)
+						if !diags.HasError() && model != nil {
+							// HACK Set Region in context.
+						}
+					}
+				}
+
+				return ctx, diags
 			}
 			interceptors := resourceInterceptors{}
 

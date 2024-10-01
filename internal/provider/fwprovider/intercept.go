@@ -194,7 +194,7 @@ func interceptedResourceHandler[Request resourceCRUDRequest, Response resourceCR
 type getAttributeFunc func(context.Context, path.Path, any) diag.Diagnostics
 
 // contextFunc augments Context.
-type contextFunc func(context.Context, getAttributeFunc, *conns.AWSClient) context.Context
+type contextFunc func(context.Context, getAttributeFunc, *conns.AWSClient) (context.Context, diag.Diagnostics)
 
 // wrappedDataSource represents an interceptor dispatcher for a Plugin Framework data source.
 type wrappedDataSource struct {
@@ -214,30 +214,46 @@ func newWrappedDataSource(bootstrapContext contextFunc, inner datasource.DataSou
 }
 
 func (w *wrappedDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
-	ctx = w.bootstrapContext(ctx, nil, w.meta)
+	ctx, _ = w.bootstrapContext(ctx, nil, w.meta)
+
 	w.inner.Metadata(ctx, request, response)
 }
 
 func (w *wrappedDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
-	ctx = w.bootstrapContext(ctx, nil, w.meta)
+	ctx, diags := w.bootstrapContext(ctx, nil, w.meta)
+	response.Diagnostics.Append(diags...)
+	if response.Diagnostics.HasError() {
+		return
+	}
+
 	w.inner.Schema(ctx, request, response)
 }
 
 func (w *wrappedDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {
+	ctx, diags := w.bootstrapContext(ctx, request.Config.GetAttribute, w.meta)
+	response.Diagnostics.Append(diags...)
+	if response.Diagnostics.HasError() {
+		return
+	}
+
 	f := func(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) diag.Diagnostics {
 		w.inner.Read(ctx, request, response)
 		return response.Diagnostics
 	}
-	ctx = w.bootstrapContext(ctx, request.Config.GetAttribute, w.meta)
-	diags := interceptedDataSourceReadHandler(w.interceptors.read(), f, w.meta)(ctx, request, response)
-	response.Diagnostics = diags
+	response.Diagnostics.Append(interceptedDataSourceReadHandler(w.interceptors.read(), f, w.meta)(ctx, request, response)...)
 }
 
 func (w *wrappedDataSource) Configure(ctx context.Context, request datasource.ConfigureRequest, response *datasource.ConfigureResponse) {
 	if v, ok := request.ProviderData.(*conns.AWSClient); ok {
 		w.meta = v
 	}
-	ctx = w.bootstrapContext(ctx, nil, w.meta)
+
+	ctx, diags := w.bootstrapContext(ctx, nil, w.meta)
+	response.Diagnostics.Append(diags...)
+	if response.Diagnostics.HasError() {
+		return
+	}
+
 	w.inner.Configure(ctx, request, response)
 }
 
@@ -269,12 +285,18 @@ func newWrappedResource(bootstrapContext contextFunc, inner resource.ResourceWit
 }
 
 func (w *wrappedResource) Metadata(ctx context.Context, request resource.MetadataRequest, response *resource.MetadataResponse) {
-	ctx = w.bootstrapContext(ctx, nil, w.meta)
+	ctx, _ = w.bootstrapContext(ctx, nil, w.meta)
+
 	w.inner.Metadata(ctx, request, response)
 }
 
 func (w *wrappedResource) Schema(ctx context.Context, request resource.SchemaRequest, response *resource.SchemaResponse) {
-	ctx = w.bootstrapContext(ctx, nil, w.meta)
+	ctx, diags := w.bootstrapContext(ctx, nil, w.meta)
+	response.Diagnostics.Append(diags...)
+	if response.Diagnostics.HasError() {
+		return
+	}
+
 	w.inner.Schema(ctx, request, response)
 
 	// HACK
@@ -287,56 +309,83 @@ func (w *wrappedResource) Schema(ctx context.Context, request resource.SchemaReq
 }
 
 func (w *wrappedResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
+	ctx, diags := w.bootstrapContext(ctx, request.Plan.GetAttribute, w.meta)
+	response.Diagnostics.Append(diags...)
+	if response.Diagnostics.HasError() {
+		return
+	}
+
 	f := func(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) diag.Diagnostics {
 		w.inner.Create(ctx, request, response)
 		return response.Diagnostics
 	}
-	ctx = w.bootstrapContext(ctx, request.Plan.GetAttribute, w.meta)
-	diags := interceptedResourceHandler(w.interceptors.create(), f, w.meta)(ctx, request, response)
-	response.Diagnostics = diags
+	response.Diagnostics.Append(interceptedResourceHandler(w.interceptors.create(), f, w.meta)(ctx, request, response)...)
 }
 
 func (w *wrappedResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
+	ctx, diags := w.bootstrapContext(ctx, request.State.GetAttribute, w.meta)
+	response.Diagnostics.Append(diags...)
+	if response.Diagnostics.HasError() {
+		return
+	}
+
 	f := func(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) diag.Diagnostics {
 		w.inner.Read(ctx, request, response)
 		return response.Diagnostics
 	}
-	ctx = w.bootstrapContext(ctx, request.State.GetAttribute, w.meta)
-	diags := interceptedResourceHandler(w.interceptors.read(), f, w.meta)(ctx, request, response)
-	response.Diagnostics = diags
+	response.Diagnostics.Append(interceptedResourceHandler(w.interceptors.read(), f, w.meta)(ctx, request, response)...)
 }
 
 func (w *wrappedResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
+	ctx, diags := w.bootstrapContext(ctx, request.Plan.GetAttribute, w.meta)
+	response.Diagnostics.Append(diags...)
+	if response.Diagnostics.HasError() {
+		return
+	}
+
 	f := func(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) diag.Diagnostics {
 		w.inner.Update(ctx, request, response)
 		return response.Diagnostics
 	}
-	ctx = w.bootstrapContext(ctx, request.Plan.GetAttribute, w.meta)
-	diags := interceptedResourceHandler(w.interceptors.update(), f, w.meta)(ctx, request, response)
-	response.Diagnostics = diags
+	response.Diagnostics.Append(interceptedResourceHandler(w.interceptors.update(), f, w.meta)(ctx, request, response)...)
 }
 
 func (w *wrappedResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
+	ctx, diags := w.bootstrapContext(ctx, request.State.GetAttribute, w.meta)
+	response.Diagnostics.Append(diags...)
+	if response.Diagnostics.HasError() {
+		return
+	}
+
 	f := func(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) diag.Diagnostics {
 		w.inner.Delete(ctx, request, response)
 		return response.Diagnostics
 	}
-	ctx = w.bootstrapContext(ctx, request.State.GetAttribute, w.meta)
-	diags := interceptedResourceHandler(w.interceptors.delete(), f, w.meta)(ctx, request, response)
-	response.Diagnostics = diags
+	response.Diagnostics.Append(interceptedResourceHandler(w.interceptors.delete(), f, w.meta)(ctx, request, response)...)
 }
 
 func (w *wrappedResource) Configure(ctx context.Context, request resource.ConfigureRequest, response *resource.ConfigureResponse) {
 	if v, ok := request.ProviderData.(*conns.AWSClient); ok {
 		w.meta = v
 	}
-	ctx = w.bootstrapContext(ctx, nil, w.meta)
+
+	ctx, diags := w.bootstrapContext(ctx, nil, w.meta)
+	response.Diagnostics.Append(diags...)
+	if response.Diagnostics.HasError() {
+		return
+	}
+
 	w.inner.Configure(ctx, request, response)
 }
 
 func (w *wrappedResource) ImportState(ctx context.Context, request resource.ImportStateRequest, response *resource.ImportStateResponse) {
 	if v, ok := w.inner.(resource.ResourceWithImportState); ok {
-		ctx = w.bootstrapContext(ctx, nil, w.meta)
+		ctx, diags := w.bootstrapContext(ctx, nil, w.meta)
+		response.Diagnostics.Append(diags...)
+		if response.Diagnostics.HasError() {
+			return
+		}
+
 		v.ImportState(ctx, request, response)
 
 		return
@@ -350,14 +399,20 @@ func (w *wrappedResource) ImportState(ctx context.Context, request resource.Impo
 
 func (w *wrappedResource) ModifyPlan(ctx context.Context, request resource.ModifyPlanRequest, response *resource.ModifyPlanResponse) {
 	if v, ok := w.inner.(resource.ResourceWithModifyPlan); ok {
-		ctx = w.bootstrapContext(ctx, request.Config.GetAttribute, w.meta)
+		ctx, diags := w.bootstrapContext(ctx, request.Config.GetAttribute, w.meta)
+		response.Diagnostics.Append(diags...)
+		if response.Diagnostics.HasError() {
+			return
+		}
+
 		v.ModifyPlan(ctx, request, response)
 	}
 }
 
 func (w *wrappedResource) ConfigValidators(ctx context.Context) []resource.ConfigValidator {
 	if v, ok := w.inner.(resource.ResourceWithConfigValidators); ok {
-		ctx = w.bootstrapContext(ctx, nil, w.meta)
+		ctx, _ = w.bootstrapContext(ctx, nil, w.meta)
+
 		return v.ConfigValidators(ctx)
 	}
 
@@ -366,14 +421,19 @@ func (w *wrappedResource) ConfigValidators(ctx context.Context) []resource.Confi
 
 func (w *wrappedResource) ValidateConfig(ctx context.Context, request resource.ValidateConfigRequest, response *resource.ValidateConfigResponse) {
 	if v, ok := w.inner.(resource.ResourceWithValidateConfig); ok {
-		ctx = w.bootstrapContext(ctx, nil, w.meta)
+		ctx, diags := w.bootstrapContext(ctx, nil, w.meta)
+		response.Diagnostics.Append(diags...)
+		if response.Diagnostics.HasError() {
+			return
+		}
+
 		v.ValidateConfig(ctx, request, response)
 	}
 }
 
 func (w *wrappedResource) UpgradeState(ctx context.Context) map[int64]resource.StateUpgrader {
 	if v, ok := w.inner.(resource.ResourceWithUpgradeState); ok {
-		ctx = w.bootstrapContext(ctx, nil, w.meta)
+		ctx, _ = w.bootstrapContext(ctx, nil, w.meta)
 
 		return v.UpgradeState(ctx)
 	}
@@ -383,7 +443,7 @@ func (w *wrappedResource) UpgradeState(ctx context.Context) map[int64]resource.S
 
 func (w *wrappedResource) MoveState(ctx context.Context) []resource.StateMover {
 	if v, ok := w.inner.(resource.ResourceWithMoveState); ok {
-		ctx = w.bootstrapContext(ctx, nil, w.meta)
+		ctx, _ = w.bootstrapContext(ctx, nil, w.meta)
 
 		return v.MoveState(ctx)
 	}

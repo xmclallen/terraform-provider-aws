@@ -378,7 +378,7 @@ func New(ctx context.Context) (*schema.Provider, error) {
 				if d != nil {
 					if v, ok := d.GetOk("override_provider"); ok && len(v.([]interface{})) > 0 && v.([]interface{})[0] != nil {
 						if v := expandOverrideProviderModel(ctx, v.([]interface{})[0].(map[string]interface{})); v != nil {
-
+							// HACK Set Region in context.
 						}
 					}
 				}
